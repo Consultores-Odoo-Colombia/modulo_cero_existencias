@@ -1,0 +1,60 @@
+<odoo>
+  <data>
+    <!-- explicit list view definition -->
+<!--
+    <record model="ir.ui.view" id="modulo_cero_existencias.list">
+      <field name="name">modulo_cero_existencias list</field>
+      <field name="model">modulo_cero_existencias.modulo_cero_existencias</field>
+      <field name="arch" type="xml">
+        <list>
+          <field name="name"/>
+          <field name="value"/>
+          <field name="value2"/>
+        </list>
+      </field>
+    </record>
+-->
+
+    <!-- actions opening views on models -->
+<!--
+    <record model="ir.actions.act_window" id="modulo_cero_existencias.action_window">
+      <field name="name">modulo_cero_existencias window</field>
+      <field name="res_model">modulo_cero_existencias.modulo_cero_existencias</field>
+      <field name="view_mode">list,form</field>
+    </record>
+-->
+
+    <!-- server action to the one above -->
+<!--
+    <record model="ir.actions.server" id="modulo_cero_existencias.action_server">
+      <field name="name">modulo_cero_existencias server</field>
+      <field name="model_id" ref="model_modulo_cero_existencias_modulo_cero_existencias"/>
+      <field name="state">code</field>
+      <field name="code">
+        action = {
+          "type": "ir.actions.act_window",
+          "view_mode": "list,form",
+          "res_model": model._name,
+        }
+      </field>
+    </record>
+-->
+
+    <!-- Top menu item -->
+<!--
+    <menuitem name="modulo_cero_existencias" id="modulo_cero_existencias.menu_root"/>
+-->
+    <!-- menu categories -->
+<!--
+    <menuitem name="Menu 1" id="modulo_cero_existencias.menu_1" parent="modulo_cero_existencias.menu_root"/>
+    <menuitem name="Menu 2" id="modulo_cero_existencias.menu_2" parent="modulo_cero_existencias.menu_root"/>
+-->
+    <!-- actions -->
+<!--
+    <menuitem name="List" id="modulo_cero_existencias.menu_1_list" parent="modulo_cero_existencias.menu_1"
+              action="modulo_cero_existencias.action_window"/>
+    <menuitem name="Server to list" id="modulo_cero_existencias" parent="modulo_cero_existencias.menu_2"
+              action="modulo_cero_existencias.action_server"/>
+-->
+  </data>
+</odoo>
