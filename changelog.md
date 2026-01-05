@@ -1,6 +1,6 @@
 # Changelog
 
-## Versión 18.0 (2026-1-05)
+## Versión 18.0 (2026-01-04)
 
 ### Nuevas características
 

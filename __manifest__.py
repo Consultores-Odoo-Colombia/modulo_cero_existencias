@@ -14,7 +14,7 @@
     'website': "https://consultoresodoocolombia.odoo.com/",
 
     'category': 'Accounting',
-    'version': '18.0',
+    'version': '18.0.1.0.0',
     'license': 'OPL-1',
 
     # Dependencias necesarias para heredar de account, point_of_sale y sale
