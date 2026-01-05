@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+
+    <t t-name="modulo_cero_existencias.StockRestrictedListRenderer.Rows" t-inherit="web.ListRenderer.Rows" t-inherit-mode="primary">
+        <xpath expr="//tr[@t-if='displayRowCreates']" position="after">
+            <tr t-if="shouldBlockCreation()">
+                <td t-if="withHandleColumn"/>
+                <td t-att-colspan="withHandleColumn ? nbCols - 1 : nbCols" class="text-center text-danger fw-bold">
+                    <i class="fa fa-exclamation-triangle me-2"/>
+                    No se permiten agregar productos con stock cero o insuficiente. Corrija las líneas existentes.
+                </td>
+            </tr>
+        </xpath>
+    </t>
+
+</templates>
