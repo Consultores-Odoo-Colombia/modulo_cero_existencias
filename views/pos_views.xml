@@ -14,21 +14,6 @@
                 <xpath expr="//field[@name='lines']" position="attributes">
                     <attribute name="widget">stock_restricted_section_and_note_one2many</attribute>
                 </xpath>
-
-                <xpath expr="//field[@name='lines']/list/field[@name='qty']" position="after">
-                    <field name="virtual_available_at_date" column_invisible="True"/>
-                    <field name="virtual_available" column_invisible="True"/>
-                    <field name="scheduled_date" column_invisible="True"/>
-                    <field name="forecast_expected_date" column_invisible="True"/>
-                    <field name="free_qty_today" column_invisible="True"/>
-                    <field name="qty_available_today" optional="show"/>
-                    <field name="warehouse_id" column_invisible="True"/>
-                    <field name="qty_to_deliver" column_invisible="True"/>
-                    <field name="state" column_invisible="True"/>
-                    <field name="is_mto" column_invisible="True"/>
-                    <field name="move_ids" column_invisible="True"/>
-                    <widget name="stock_availability_icon" width="20px"/>
-                </xpath>
             </field>
         </record>
     </data>
