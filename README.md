@@ -8,6 +8,7 @@ Este módulo añade una validación estricta para evitar que se procesen factura
 
 ## Características
 *   **Validación de Facturas y Notas:** Impide la confirmación de facturas (Cliente/Proveedor) y rectificativas si el monto total es 0.
+*   **Validación de Stock (Ventas):** Impide confirmar Órdenes de Venta si no hay suficiente stock a mano (qty_available).
 *   **Validación de POS:** Impide la creación de pedidos de punto de venta si el monto total es 0.
 
 ## Instalación

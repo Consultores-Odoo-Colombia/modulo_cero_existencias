@@ -1,0 +1,35 @@
+<odoo>
+    <data>
+        <!-- Extension to POS Order (Backend) Form View -->
+        <record id="view_pos_order_form_inherit_stock_indicator" model="ir.ui.view">
+            <field name="name">pos.order.form.inherit.stock.indicator</field>
+            <field name="model">pos.order</field>
+            <field name="inherit_id" ref="point_of_sale.view_pos_pos_form"/>
+            <field name="arch" type="xml">
+                <!-- Add Blocking Banner at the top of the pos order lines page -->
+                <xpath expr="//field[@name='lines']" position="before">
+                    <field name="stock_warning_banner" nolabel="1" colspan="2"/>
+                </xpath>
+
+                <xpath expr="//field[@name='lines']" position="attributes">
+                    <attribute name="widget">stock_restricted_section_and_note_one2many</attribute>
+                </xpath>
+
+                <xpath expr="//field[@name='lines']/list/field[@name='qty']" position="after">
+                    <field name="virtual_available_at_date" column_invisible="True"/>
+                    <field name="virtual_available" column_invisible="True"/>
+                    <field name="scheduled_date" column_invisible="True"/>
+                    <field name="forecast_expected_date" column_invisible="True"/>
+                    <field name="free_qty_today" column_invisible="True"/>
+                    <field name="qty_available_today" optional="show"/>
+                    <field name="warehouse_id" column_invisible="True"/>
+                    <field name="qty_to_deliver" column_invisible="True"/>
+                    <field name="state" column_invisible="True"/>
+                    <field name="is_mto" column_invisible="True"/>
+                    <field name="move_ids" column_invisible="True"/>
+                    <widget name="stock_availability_icon" width="20px"/>
+                </xpath>
+            </field>
+        </record>
+    </data>
+</odoo>

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-name="modulo_cero_existencias.StockAvailabilityIcon">
+        <div class="o_stock_availability_icon d-inline-block" t-att-title="stockInfo.title">
+            <i t-attf-class="fa {{stockInfo.icon}} {{stockInfo.color}}" 
+               style="font-size: 1.2em; margin-left: 5px; cursor: help;"
+               role="img" 
+               t-att-aria-label="stockInfo.title"/>
+        </div>
+    </t>
+</templates>
