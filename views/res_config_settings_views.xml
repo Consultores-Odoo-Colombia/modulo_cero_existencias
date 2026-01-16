@@ -9,35 +9,27 @@
             <field name="arch" type="xml">
                 <!-- Sales Settings: Insert after 'Product Catalog' block -->
                 <xpath expr="//block[@name='catalog_setting_container']" position="after">
-                    <block title="Stock Restrictions" id="stock_restriction_sale_setting">
+                    <block title="Stock Restrictions" id="stock_restriction_sale_setting" app="sale">
                         <setting id="restrict_zero_stock_sale" help="Impide agregar productos con stock cero o negativo a las órdenes de venta.">
                             <field name="restrict_zero_sale"/>
+                        </setting>
+                        <setting id="stock_restriction_type_sale" help="Elige si validar contra stock físico o pronosticado.">
+                            <field name="stock_restriction_type" widget="radio"/>
                         </setting>
                     </block>
                 </xpath>
 
                 <!-- Invoicing Settings: Insert after 'Customer Invoices' block -->
                  <xpath expr="//block[@id='invoicing_settings']" position="after">
-                    <block title="Stock Restrictions" id="stock_restriction_account_setting">
+                    <block title="Stock Restrictions" id="stock_restriction_account_setting" app="account">
                         <setting id="restrict_zero_stock_invoice" help="Impide agregar productos con stock cero o negativo a las facturas de cliente.">
                             <field name="restrict_zero_invoice"/>
                         </setting>
-                    </block>
-                </xpath>
-                
-                <!-- POS Settings: Insert after 'PoS Interface' block -->
-                 <xpath expr="//block[@id='pos_interface_section']" position="after">
-                    <block title="Stock Restrictions" id="stock_restriction_pos_setting">
-                        <setting id="restrict_zero_stock_pos" help="Impide agregar productos con stock cero o negativo en el POS.">
-                            <field name="restrict_zero_pos"/>
+                        <setting id="stock_restriction_type_account" help="Elige si validar contra stock físico o pronosticado.">
+                            <field name="stock_restriction_type" widget="radio"/>
                         </setting>
                     </block>
-                </xpath>    
-                 <!-- POS Settings (if POS installed block exists, trying to find a good spot) -->
-                 <!-- Usually POS has its own block 'pos_interface' or similar, strict inheritance might fail if block id not found. -->
-                 <!-- Safer to put in a general section or try 'point_of_sale' block if knowable. -->
-                 <!-- For now, since user has POS, we'll try to check if we can add it safely. -->
-                 <!-- Adding to general settings for visibility if specific blocks are hard to target without exact IDs. -->
+                </xpath>
             </field>
         </record>
     </data>

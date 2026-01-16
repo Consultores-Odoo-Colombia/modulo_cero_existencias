@@ -23,9 +23,13 @@ class AccountMove(models.Model):
                 for line in move.invoice_line_ids:
                     if line.display_type == 'product' or (not line.display_type and line.product_id):
                         # Config check: only warn if restricted
-                         if line.product_id.type != 'service' and line.quantity > line.product_id.virtual_available:
-                            move.stock_warning_banner = _('<div class="alert alert-danger" role="alert">⚠️ <b>Alerta de Stock:</b> La cantidad solicitada supera el stock pronosticado disponible.</div>')
-                            break
+                         if line.product_id.type != 'service':
+                            stock_field = 'virtual_available' if move.company_id.stock_restriction_type == 'forecast' else 'qty_available'
+                            stock_qty = getattr(line.product_id, stock_field)
+                            
+                            if line.quantity > stock_qty:
+                                move.stock_warning_banner = _('<div class="alert alert-danger" role="alert">⚠️ <b>Alerta de Stock:</b> La cantidad solicitada supera el stock disponible (%s).</div>') % stock_qty
+                                break
 
     def action_post(self):
         # Strict Validation on Post (Invoice Confirmation)
@@ -46,8 +50,11 @@ class AccountMove(models.Model):
                         
                         # Stock Check
                         if line.product_id.type != 'service':
-                             if line.quantity > line.product_id.virtual_available:
-                                raise ValidationError(_("Restricción Activa: No hay suficiente stock pronosticado para el producto %s. (Solicitado: %s, Pronosticado: %s)") % (line.product_id.name, line.quantity, line.product_id.virtual_available))
+                             stock_field = 'virtual_available' if move.company_id.stock_restriction_type == 'forecast' else 'qty_available'
+                             stock_qty = getattr(line.product_id, stock_field)
+                             
+                             if line.quantity > stock_qty:
+                                raise ValidationError(_("Restricción Activa: No hay suficiente stock para el producto %s. (Solicitado: %s, Disponible: %s)") % (line.product_id.name, line.quantity, stock_qty))
         
         return super(AccountMove, self).action_post()
 
@@ -68,9 +75,13 @@ class SaleOrder(models.Model):
                 continue
 
             for line in order.order_line:
-                if line.product_id.type != 'service' and line.product_uom_qty > line.product_id.virtual_available:
-                    order.stock_warning_banner = _('<div class="alert alert-danger" role="alert">⚠️ <b>Alerta de Stock (Ventas):</b> Cantidad supera el stock pronosticado.</div>')
-                    break
+                if line.product_id.type != 'service':
+                    stock_field = 'virtual_available' if order.company_id.stock_restriction_type == 'forecast' else 'qty_available'
+                    stock_qty = getattr(line.product_id, stock_field)
+                    
+                    if line.product_uom_qty > stock_qty:
+                        order.stock_warning_banner = _('<div class="alert alert-danger" role="alert">⚠️ <b>Alerta de Stock (Ventas):</b> Cantidad supera el stock disponible (%s).</div>') % stock_qty
+                        break
 
     def action_confirm(self):
         _logger.info(">>>>>>>>> VALIDAR VENTA (action_confirm) - INICIO <<<<<<<<<<")
@@ -89,8 +100,11 @@ class SaleOrder(models.Model):
                      raise ValidationError(_("No se puede confirmar la venta: El precio del producto %s es 0 o negativo.") % line.product_id.name)
 
                 if line.product_id.type != 'service':
-                    if line.product_uom_qty > line.product_id.virtual_available:
-                         raise ValidationError(_("Restricción Activa: No hay suficiente stock pronosticado para el producto %s. (Solicitado: %s, Pronosticado: %s)") % (line.product_id.name, line.product_uom_qty, line.product_id.virtual_available))
+                    stock_field = 'virtual_available' if order.company_id.stock_restriction_type == 'forecast' else 'qty_available'
+                    stock_qty = getattr(line.product_id, stock_field)
+                    
+                    if line.product_uom_qty > stock_qty:
+                         raise ValidationError(_("Restricción Activa: No hay suficiente stock para el producto %s. (Solicitado: %s, Disponible: %s)") % (line.product_id.name, line.product_uom_qty, stock_qty))
         
         return super(SaleOrder, self).action_confirm()
 
@@ -120,7 +134,9 @@ class SaleOrderLine(models.Model):
             if not company.restrict_zero_sale:
                 return
 
-            stock_on_hand = line.product_id.virtual_available
+            stock_field = 'virtual_available' if company.stock_restriction_type == 'forecast' else 'qty_available'
+            stock_on_hand = getattr(line.product_id, stock_field)
+            
             if stock_on_hand <= 0:
                  # Clear line
                  line.product_id = False
@@ -128,7 +144,7 @@ class SaleOrderLine(models.Model):
                  return {
                     'warning': {
                         'title': _("Producto no disponible (Restricción Activa)"),
-                        'message': _("El producto ha sido eliminado porque no tiene stock pronosticado (%s) y la restricción está activada.") % stock_on_hand
+                        'message': _("El producto ha sido eliminado porque no tiene stock disponible (%s) y la restricción está activada.") % stock_on_hand
                     }
                 }
             
@@ -139,7 +155,7 @@ class SaleOrderLine(models.Model):
                  return {
                     'warning': {
                         'title': _("Stock Insuficiente (Restricción Activa)"),
-                        'message': _("No puedes solicitar más del stock pronosticado. (Solicitado: %s, Pronosticado: %s).") % (ordered_qty, stock_on_hand)
+                        'message': _("No puedes solicitar más del stock disponible. (Solicitado: %s, Disponible: %s).") % (ordered_qty, stock_on_hand)
                     }
                 }
 
@@ -175,14 +191,16 @@ class AccountMoveLine(models.Model):
             if not company.restrict_zero_invoice:
                 return
 
-            stock_on_hand = line.product_id.virtual_available
+            stock_field = 'virtual_available' if company.stock_restriction_type == 'forecast' else 'qty_available'
+            stock_on_hand = getattr(line.product_id, stock_field)
+            
             if stock_on_hand <= 0:
                  line.product_id = False
                  line.quantity = 0
                  return {
                     'warning': {
                         'title': _("Producto no disponible (Restricción Activa)"),
-                        'message': _("El producto ha sido eliminado porque no tiene stock pronosticado (%s).") % stock_on_hand
+                        'message': _("El producto ha sido eliminado porque no tiene stock disponible (%s).") % stock_on_hand
                     }
                 }
 
@@ -193,7 +211,7 @@ class AccountMoveLine(models.Model):
                  return {
                     'warning': {
                         'title': _("Stock Insuficiente (Restricción Activa)"),
-                        'message': _("No puedes facturar más del stock pronosticado. (Solicitado: %s, Pronosticado: %s).") % (ordered_qty, stock_on_hand)
+                        'message': _("No puedes facturar más del stock disponible. (Solicitado: %s, Disponible: %s).") % (ordered_qty, stock_on_hand)
                     }
                 }
 
@@ -218,13 +236,21 @@ class ProductProduct(models.Model):
         if not location:
             return 0
 
-        # Buscar quants en la ubicación y sus hijas
-        quants = self.env['stock.quant'].search([
-            ('product_id', '=', self.id),
-            ('location_id', 'child_of', location.id),
-        ])
+        # Check Config
+        stock_type = pos_config.company_id.stock_restriction_type
         
-        # Disponible para vender (A la mano - Reservado)
-        return sum(quants.mapped('available_quantity'))
+        if stock_type == 'forecast':
+             # Use virtual_available context location logic if possible, 
+             # but virtual_available is strictly Computed based on global or context.
+             # For POS, if we want "Forecasted" at that location?  product.with_context(location=...).virtual_available
+             
+             return self.with_context(location=location.id).virtual_available
+        else:
+            # ON HAND (Fisico) - Using Quants
+            quants = self.env['stock.quant'].search([
+                ('product_id', '=', self.id),
+                ('location_id', 'child_of', location.id),
+            ])
+            return sum(quants.mapped('available_quantity'))
 
 

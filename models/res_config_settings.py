@@ -8,6 +8,10 @@ class ResCompany(models.Model):
     restrict_zero_sale = fields.Boolean("Restringir Ventas en Cero", default=True)
     restrict_zero_invoice = fields.Boolean("Restringir Facturación en Cero", default=True)
     restrict_zero_pos = fields.Boolean("Restringir POS en Cero", default=True)
+    stock_restriction_type = fields.Selection([
+        ('forecast', 'Stock Pronosticado (Virtual)'),
+        ('on_hand', 'Stock Disponible (Físico/A Mano)')
+    ], string="Tipo de Restricción", default='forecast')
 
 class ResConfigSettings(models.TransientModel):
     _inherit = 'res.config.settings'
@@ -26,4 +30,9 @@ class ResConfigSettings(models.TransientModel):
         related='company_id.restrict_zero_pos', 
         readonly=False,
         string="Restringir POS con Stock Cero/Negativo"
+    )
+    stock_restriction_type = fields.Selection(
+        related='company_id.stock_restriction_type',
+        readonly=False,
+        string="Tipo de Restricción de Stock"
     )
