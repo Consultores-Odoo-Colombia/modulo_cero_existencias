@@ -9,7 +9,6 @@ export class StockRestrictedListRenderer extends SectionAndNoteListRenderer {
 
     get displayRowCreates() {
         const shouldBlock = this.shouldBlockCreation();
-        console.log("[StockRestricted] displayRowCreates check:", shouldBlock);
         
         // Check if we should block creation
         if (shouldBlock) {
@@ -18,21 +17,44 @@ export class StockRestrictedListRenderer extends SectionAndNoteListRenderer {
         return super.displayRowCreates;
     }
 
+    setup() {
+        super.setup();
+        this.notification = this.env.services.notification;
+    }
+
+    async onCellKeydown(ev, record, column) {
+        // Intercept Enter and Tab to prevent "Save & New" if stock is invalid
+        // console.log("[StockRestricted] onCellKeydown:", ev.key, "Record:", record);
+        if (ev.key === "Enter" || ev.key === "Tab") {
+             // We rely on shouldBlockCreation() because it iterates all records (including the current one if it's in the list)
+             // and checks for any violation. This bypasses the issue of 'record' being undefined in some contexts.
+             if (this.shouldBlockCreation()) {
+                ev.preventDefault();
+                ev.stopPropagation();
+                
+                // Show a generic message because we might be blocking due to ANY bad line
+                this.notification.add(("No se permiten agregar productos con stock cero o insuficiente. Corrija las líneas existentes."), {
+                    type: "danger",
+                    sticky: false,
+                });
+                return;
+             }
+        }
+        
+        return super.onCellKeydown(ev, record, column);
+    }
+
     shouldBlockCreation() {
         // Iterate over records to check for stock issues
         // We look for the status set by our widget logic or checking fields directly
         for (const record of this.props.list.records) {
             const data = record.data;
-            const virtualAvailable = data.virtual_available_at_date || 0;
+            // Use correct field: qty_on_hand_check
+            const limit = data.qty_on_hand_check !== undefined ? data.qty_on_hand_check : (data.virtual_available_at_date || 0);
             const qty = data.quantity || data.qty || data.product_uom_qty || 0;
             const productId = data.product_id;
 
-            // Debug logic
-            // console.log("Checking record:", record.resId, "Prod:", productId, "Qty:", qty, "Avail:", virtualAvailable);
-
-            // Strict check: If product is selected AND (avail <= 0 OR qty > avail)
-            if (productId && (virtualAvailable <= 0 || qty > virtualAvailable)) {
-                console.log("[StockRestricted] BLOCKING due to record:", record.resId);
+            if (productId && (limit <= 0 || qty > limit)) {
                 return true; 
             }
         }

@@ -11,6 +11,10 @@
                     <field name="stock_warning_banner" nolabel="1" colspan="2"/>
                 </xpath>
 
+                <xpath expr="//field[@name='invoice_line_ids']/list//field[@name='product_id']" position="after">
+                    <field name="qty_on_hand_check" column_invisible="True"/>
+                </xpath>
+
                 <xpath expr="//field[@name='invoice_line_ids']" position="attributes">
                     <attribute name="widget">stock_restricted_section_and_note_one2many</attribute>
                 </xpath>
