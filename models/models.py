@@ -11,25 +11,34 @@ class AccountMove(models.Model):
 
     stock_warning_banner = fields.Html(compute='_compute_stock_warning_banner')
 
-    @api.depends('invoice_line_ids.quantity', 'invoice_line_ids.product_id', 'invoice_line_ids.product_id.free_qty')
+    @api.depends('invoice_line_ids.quantity', 'invoice_line_ids.product_id', 'invoice_line_ids.product_id.qty_available')
     def _compute_stock_warning_banner(self):
         for move in self:
             move.stock_warning_banner = False
+            # Check Config
+            if not move.company_id.restrict_zero_invoice:
+                continue
+
             if move.move_type in ['out_invoice', 'out_refund']:
                 for line in move.invoice_line_ids:
                     if line.display_type == 'product' or (not line.display_type and line.product_id):
-                         if line.product_id.type == 'product' and line.quantity > line.product_id.free_qty:
-                            move.stock_warning_banner = _('<div class="alert alert-danger" role="alert">⚠️ <b>Alerta de Stock:</b> Uno o más productos superan la cantidad libre disponible. No podrá confirmar esta factura.</div>')
+                        # Config check: only warn if restricted
+                         if line.product_id.type == 'product' and line.quantity > line.product_id.qty_available:
+                            move.stock_warning_banner = _('<div class="alert alert-danger" role="alert">⚠️ <b>Alerta de Stock:</b> Uno o más productos superan la cantidad a mano.</div>')
                             break
 
     def action_post(self):
-        # Strict Validation on Post (Invoice Confirmation) - Safety Net
+        # Strict Validation on Post (Invoice Confirmation)
         _logger.info(">>>>>>>>> VALIDAR FACTURA (action_post) <<<<<<<<<<")
         for move in self:
+            if not move.company_id.restrict_zero_invoice:
+                continue
+
             if move.move_type in ['out_invoice', 'out_refund']:
                 for line in move.invoice_line_ids:
                     # Validate product lines
                     if line.display_type == 'product' or (not line.display_type and line.product_id):
+                        # Basic quantity/price set checks
                         if line.quantity <= 0:
                             raise ValidationError(_("No se puede confirmar: La cantidad en la línea del producto %s es 0 o negativa.") % line.product_id.name)
                         if line.price_unit <= 0:
@@ -37,25 +46,13 @@ class AccountMove(models.Model):
                         
                         # Stock Check
                         if line.product_id.type == 'product':
-                             if line.quantity > line.product_id.free_qty:
-                                raise ValidationError(_("No hay suficientes existencias libres para el producto %s. (Solicitado: %s, Libre: %s)") % (line.product_id.name, line.quantity, line.product_id.free_qty))
+                             if line.quantity > line.product_id.qty_available:
+                                raise ValidationError(_("Restricción Activa: No hay suficientes existencias a la mano para el producto %s. (Solicitado: %s, A la mano: %s)") % (line.product_id.name, line.quantity, line.product_id.qty_available))
         
         return super(AccountMove, self).action_post()
 
 
-class PosOrder(models.Model):
-    _inherit = 'pos.order'
-    
-    stock_warning_banner = fields.Html(compute='_compute_stock_warning_banner')
 
-    @api.depends('lines.qty', 'lines.product_id', 'lines.product_id.free_qty')
-    def _compute_stock_warning_banner(self):
-        for order in self:
-            order.stock_warning_banner = False
-            for line in order.lines:
-                if line.product_id.type == 'product' and line.qty > line.product_id.free_qty:
-                    order.stock_warning_banner = _('<div class="alert alert-danger" role="alert">⚠️ <b>Alerta de Stock:</b> Tienes productos con cantidad superior al stock libre.</div>')
-                    break
 
 
 class SaleOrder(models.Model):
@@ -63,21 +60,27 @@ class SaleOrder(models.Model):
 
     stock_warning_banner = fields.Html(compute='_compute_stock_warning_banner')
 
-    @api.depends('order_line.product_uom_qty', 'order_line.product_id', 'order_line.product_id.free_qty')
+    @api.depends('order_line.product_uom_qty', 'order_line.product_id', 'order_line.product_id.qty_available')
     def _compute_stock_warning_banner(self):
         for order in self:
             order.stock_warning_banner = False
+            if not order.company_id.restrict_zero_sale:
+                continue
+
             for line in order.order_line:
-                if line.product_id.type == 'product' and line.product_uom_qty > line.product_id.free_qty:
-                    order.stock_warning_banner = _('<div class="alert alert-danger" role="alert">⚠️ <b>Alerta de Stock:</b> Tienes productos con cantidad superior al stock libre. No podrás confirmar la venta.</div>')
+                if line.product_id.type == 'product' and line.product_uom_qty > line.product_id.qty_available:
+                    order.stock_warning_banner = _('<div class="alert alert-danger" role="alert">⚠️ <b>Alerta de Stock (Ventas):</b> Productos sin stock a la mano.</div>')
                     break
 
     def action_confirm(self):
         _logger.info(">>>>>>>>> VALIDAR VENTA (action_confirm) - INICIO <<<<<<<<<<")
-        # Safety Net for Confirmation
         for order in self:
+            if not order.company_id.restrict_zero_sale:
+                _logger.info("StockRestriction: Skipping validation (Setting Disabled)")
+                continue
+
             if not order.order_line:
-                raise ValidationError(_("No se puede confirmar una orden de venta vacía. Agregue líneas de producto."))
+                raise ValidationError(_("No se puede confirmar una orden de venta vacía."))
 
             for line in order.order_line:
                 if line.product_uom_qty <= 0:
@@ -86,70 +89,115 @@ class SaleOrder(models.Model):
                      raise ValidationError(_("No se puede confirmar la venta: El precio del producto %s es 0 o negativo.") % line.product_id.name)
 
                 if line.product_id.type == 'product':
-                    if line.product_uom_qty > line.product_id.free_qty:
-                         raise ValidationError(_("No hay suficientes existencias libres para el producto %s. (Solicitado: %s, Libre: %s)") % (line.product_id.name, line.product_uom_qty, line.product_id.free_qty))
+                    if line.product_uom_qty > line.product_id.qty_available:
+                         raise ValidationError(_("Restricción Activa: No hay suficientes existencias a la mano para el producto %s. (Solicitado: %s, A la mano: %s)") % (line.product_id.name, line.product_uom_qty, line.product_id.qty_available))
         
-        _logger.info(">>>>>>>>> VALIDAR VENTA (action_confirm) - FIN EXITOSO <<<<<<<<<<")
         return super(SaleOrder, self).action_confirm()
+
 
 
 class SaleOrderLine(models.Model):
     _inherit = 'sale.order.line'
 
+    qty_on_hand_check = fields.Float(compute='_compute_qty_on_hand_check', store=False)
+
+    @api.depends('product_id')
+    def _compute_qty_on_hand_check(self):
+        for line in self:
+            if line.product_id:
+                line.qty_on_hand_check = line.product_id.qty_available
+            else:
+                line.qty_on_hand_check = 0.0
+
+    @api.onchange('product_id', 'product_uom_qty')
+    def _onchange_product_id_check_stock(self):
+        for line in self:
+            if not line.product_id or line.product_id.type != 'product':
+                continue
+            
+            # Check Config - Use company_id directly if possible or env user company as fallback context
+            company = line.company_id or line.order_id.company_id or self.env.company
+            if not company.restrict_zero_sale:
+                return
+
+            stock_on_hand = line.product_id.qty_available
+            if stock_on_hand <= 0:
+                 # Clear line
+                 line.product_id = False
+                 line.product_uom_qty = 0
+                 return {
+                    'warning': {
+                        'title': _("Producto no disponible (Restricción Activa)"),
+                        'message': _("El producto ha sido eliminado del formulario porque no tiene stock a la mano (%s) y la restricción de ventas está activada.") % stock_on_hand
+                    }
+                }
+            
+            if line.product_uom_qty > stock_on_hand:
+                 ordered_qty = line.product_uom_qty
+                 line.product_id = False
+                 line.product_uom_qty = 0
+                 return {
+                    'warning': {
+                        'title': _("Stock Insuficiente (Restricción Activa)"),
+                        'message': _("No puedes agregar una cantidad mayor al stock disponible. (Solicitado: %s, A la mano: %s). El producto ha sido eliminado.") % (ordered_qty, stock_on_hand)
+                    }
+                }
+
     @api.constrains('product_uom_qty', 'price_unit', 'product_id')
     def _check_strict_values_and_stock(self):
-        # Triggered on Save/Create of the line (Draft state)
-        for line in self:
-            if line.product_id.type == 'product':
-                # 1. Price and Quantity strictly positive
-                if line.product_uom_qty <= 0:
-                    raise ValidationError(_("La cantidad del producto %s debe ser mayor a 0.") % line.product_id.name)
-                if line.price_unit <= 0:
-                    raise ValidationError(_("El precio del producto %s debe ser mayor a 0.") % line.product_id.name)
-                
-                # 2. Strict Stock Check (Free Qty)
-                # We interpret "Stock a la mano" in the context of availability as "Free Qty" (Hand - Reserved)
-                if line.product_uom_qty > line.product_id.free_qty:
-                    raise ValidationError(_("Stock insuficiente para %s. Solicitado: %s, Disponible(Libre): %s") % (line.product_id.name, line.product_uom_qty, line.product_id.free_qty))
-
+         # Validations delegated to action_confirm
+         pass
 
 class AccountMoveLine(models.Model):
     _inherit = 'account.move.line'
 
+    qty_on_hand_check = fields.Float(compute='_compute_qty_on_hand_check', store=False)
+
+    @api.depends('product_id')
+    def _compute_qty_on_hand_check(self):
+        for line in self:
+            if line.product_id:
+                line.qty_on_hand_check = line.product_id.qty_available
+            else:
+                line.qty_on_hand_check = 0.0
+
+    @api.onchange('product_id', 'quantity')
+    def _onchange_product_id_check_stock(self):
+        for line in self:
+            if not line.product_id or line.product_id.type != 'product':
+                continue
+            
+            if line.move_id.move_type not in ('out_invoice', 'out_refund'):
+                continue
+            
+            # Check Config
+            company = line.company_id or line.move_id.company_id or self.env.company
+            if not company.restrict_zero_invoice:
+                return
+
+            stock_on_hand = line.product_id.qty_available
+            if stock_on_hand <= 0:
+                 line.product_id = False
+                 line.quantity = 0
+                 return {
+                    'warning': {
+                        'title': _("Producto no disponible (Restricción Activa)"),
+                        'message': _("El producto ha sido eliminado de la factura porque no tiene stock a la mano (%s) y la restricción de facturación está activada.") % stock_on_hand
+                    }
+                }
+
+            if line.quantity > stock_on_hand:
+                 ordered_qty = line.quantity
+                 line.product_id = False
+                 line.quantity = 0
+                 return {
+                    'warning': {
+                        'title': _("Stock Insuficiente (Restricción Activa)"),
+                        'message': _("No puedes facturar una cantidad mayor al stock disponible. (Solicitado: %s, A la mano: %s). El producto ha sido eliminado.") % (ordered_qty, stock_on_hand)
+                    }
+                }
+
     @api.constrains('quantity', 'price_unit', 'product_id')
     def _check_strict_values_and_stock_invoice(self):
-        # Triggered on Save/Create of the line (Draft state)
-        for line in self:
-            # Only apply to Customer Invoices/Refunds validation logic, but constrains run on all moves.
-            # We filter by move_type usually, but line.move_id might not be fully set in some contexts? 
-            # Safe checking move_type.
-            if line.move_id.move_type in ['out_invoice', 'out_refund']:
-                if line.display_type == 'product' or (not line.display_type and line.product_id):
-                     if line.quantity <= 0:
-                        raise ValidationError(_("La cantidad en la factura para %s debe ser mayor a 0.") % line.product_id.name)
-                     if line.price_unit <= 0:
-                        raise ValidationError(_("El precio en la factura para %s debe ser mayor a 0.") % line.product_id.name)
-                     
-                     # Stock Check
-                     if line.product_id.type == 'product':
-                        if line.quantity > line.product_id.free_qty:
-                             raise ValidationError(_("Stock insuficiente para %s. Solicitado: %s, Disponible(Libre): %s") % (line.product_id.name, line.quantity, line.product_id.free_qty))
+         pass
 
-
-class PosOrderLine(models.Model):
-    _inherit = 'pos.order.line'
-
-    @api.constrains('qty', 'product_id', 'price_unit')
-    def _check_stock_availability_pos(self):
-        for line in self:
-            if line.product_id and line.product_id.type == 'product':
-                # Strict Validation: Quantity checks
-                if line.qty <= 0:
-                    raise ValidationError(_("La cantidad en el POS no puede ser 0 o negativa para el producto %s.") % line.product_id.name)
-
-                if line.price_unit <= 0:
-                    raise ValidationError(_("El precio del producto %s no puede ser 0 o negativo.") % line.product_id.name)
-
-                # Stock Check (Use free_qty)
-                if line.qty > line.product_id.free_qty:
-                    raise ValidationError(_("No hay suficientes existencias libres para el producto %s en el POS. (Solicitado: %s, Libre: %s)") % (line.product_id.name, line.qty, line.product_id.free_qty))
