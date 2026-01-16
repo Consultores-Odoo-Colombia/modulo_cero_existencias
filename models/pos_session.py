@@ -1,9 +1,10 @@
-from odoo import models
+from odoo import models, api
 
-class PosSession(models.Model):
-    _inherit = 'pos.session'
+class ResCompany(models.Model):
+    _inherit = 'res.company'
 
-    def _loader_params_res_company(self):
-        result = super()._loader_params_res_company()
-        result['search_params']['fields'].append('restrict_zero_pos')
-        return result
+    @api.model
+    def _load_pos_data_fields(self, config_id):
+        params = super()._load_pos_data_fields(config_id)
+        params.append('restrict_zero_pos')
+        return params
